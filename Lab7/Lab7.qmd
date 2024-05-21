@@ -1,0 +1,147 @@
+---
+title: "Lab7: Introduction to machine learning for Bioinformatics"
+author: "Duy An Le (PID: A16400411)"
+format: pdf
+---
+
+Today we will start our multi-part exploration of some key machine learning methods. We will begin with clustering- finding groupings in data, and then dimensionality reduction. 
+
+# Clustering 
+
+## K-means Clustering
+
+Let's start with "k-means" clustering. The main function in base R for this is `kmeans()`. 
+
+```{r}
+# Make up some data
+temp <- c(rnorm(30, -3), rnorm(30, +3))
+data <- cbind(x=temp, y=rev(temp))
+plot(data)
+```
+Now let's try out `kmeans()`
+```{r}
+km <- kmeans(data, centers=2)
+km
+```
+> Q. How many points in each cluster? 
+
+```{r}
+km$size
+```
+> Q. What component of your result object details cluster assignment/membership?
+
+```{r}
+km$cluster
+```
+> Q. What are centers/mean values of each cluster?
+
+```{r}
+km$centers
+```
+> Q. Make a plot of your data showing your clustering results (groupings/clusters and cluster centers). 
+
+```{r}
+plot(data, col=km$cluster+3, pch=19)
+points(km$centers, pch=19)
+abline(v=km$centers[,1], h=km$centers[,2], lty=3)
+```
+>Q. Run `kmeans()` again and cluster in 4 groups and plot the results.
+
+```{r}
+km2 <- kmeans(data, centers=4)
+plot(data, col=km2$cluster+3, pch=19)
+points(km2$centers, pch=19)
+abline(v=km2$centers[,1], h=km2$centers[,2], lty=3)
+```
+
+## Hierarchical Clustering
+This "bottom-up" form of clustering aims to reveal the structure in your data by progressively grouping points into an ever smaller number of clusters. 
+
+The main function in base R for this called `hclust()`. This function does not take our input data directly, but wants a "distance matrix" that details how (dis)similar all our input points are to each other. 
+```{r}
+hc <- hclust(dist(data))
+hc
+```
+The print out above is not very useful (unlike with `kmeans()`) but there is a useful `plot()` method. 
+```{r}
+plot(hc)
+abline(h=10, col="red")
+```
+To get my main result (my cluster membership vector) I need to "cut" my tree using the function `cutree()`. 
+
+```{r}
+grps <- cutree(hc, h=10)
+plot(data, col=grps)
+```
+
+# Principal Component Analysis 
+
+## Example 1: UK foods
+Importing and inspecting data: 
+```{r}
+url <- "https://tinyurl.com/UK-foods"
+ukFoods_df <- read.csv(url, row.names=1)
+head(ukFoods_df)
+```
+Initial plots, spotting any differences:
+```{r}
+barplot(as.matrix(ukFoods_df), beside=T, col=rainbow(nrow(ukFoods_df)))
+barplot(as.matrix(ukFoods_df), beside=F, col=rainbow(nrow(ukFoods_df)))
+pairs(ukFoods_df, col=rainbow(10), pch=16)
+```
+In general, these plots are unhelpful for analyzing datasets with multiple dimensions. PCA is a better way of finding these differences and trends among data points. 
+
+Use `prcomp()` to perform PCA. 
+```{r}
+pca <- prcomp(t(ukFoods_df))
+summary(pca)
+```
+PC1 and PC2 account for ~96.5% of the variance in the data, useful to plot these two against each other to see differences in data. This is called an ordination plot. 
+
+```{r}
+# Plot PC1 vs PC2
+color=c("orange", "hotpink2", "cornflowerblue", "darkolivegreen3")
+plot(pca$x[,1], pca$x[,2], xlab="PC1", ylab="PC2", xlim=c(-270,500), pch=16, col=color)
+text(pca$x[,1], pca$x[,2], colnames(ukFoods_df), col=color)
+abline(v=0, h=0, col="gray")
+```
+Another inportant output from pCA is called the "loadings" vector or the "rotation" component - this tells us how much the original variables (the foods in this case) contribute to the new PCs.
+```{r}
+## Lets focus on PC1 as it accounts for > 67% of variance 
+par(mar=c(10, 3, 0.35, 0))
+barplot( pca$rotation[,1], las=2 )
+```
+PCA looks to be a super useful method for gaining some insight into high dimensional data that is difficult to examine in other ways. 
+
+## Example 2: RNAseq data
+
+```{r}
+url2 <- "https://tinyurl.com/expression-CSV"
+rna.data <- read.csv(url2, row.names=1)
+head(rna.data)
+```
+Run PCA analysis on this RNA data
+```{r}
+## Again we have to take the transpose of our data 
+pca <- prcomp(t(rna.data), scale=TRUE)
+summary(pca)
+```
+PC1 accounts for ~93% of variance in data, with PC2, 95% of data variance is accounted in just two variables. 
+
+```{r}
+## Simple un polished plot of pc1 and pc2
+plot(pca$x[,1], pca$x[,2], xlab="PC1", ylab="PC2")
+```
+Make a nice figure using ggplot:
+```{r}
+library(ggplot2)
+
+# Convert PCA results into dataframe for ggplot
+res <- as.data.frame(pca$x)
+
+# Now use ggplot to make a plot of PC coordinates of samples
+mycols <- c(rep("blue", 5 ), rep("red", 5))
+ggplot(res) + aes(x=PC1, y=PC2, label=row.names(res)) + geom_label(color=mycols)
+```
+
+
