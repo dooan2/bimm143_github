@@ -15,7 +15,7 @@ My Classwork for BIMM 143 SP24 at UC San Diego.
 - **Class 12** [Structural Bioinformatics (pt2. Focus on new AlphaFold2)](Lab12/Lab12.pdf)
 - **Class 13** [Transcriptomics and the analysis of RNA-Seq data](Lab13/Lab13.pdf)
 - **Class 14** [RNA-Seq analysis mini-project](Lab14/Lab14.pdf)
-- **Class 15** [Hands-on with Git and GitHub](Lab15)
+- **Class 15** [Hands-on with Git and GitHub]()
 - **Class 16** [Essential UNIX for bioinformatics]()
 - **Class 17** [Analyzing sequencing data in the cloud]()
 - **Class 18** [Mini Project: Investigating Pertussis Resurgence]()
