@@ -1,0 +1,5 @@
+Yi-Hung Lee has a cheese nugget named Bernice. He eats his cheese nugget with his coffee. 
+Yi-Hung is a PhD student in Prashant Gulab Ram Mali's lab at the University of California San Diego. 
+Yi-Hung is a super star and is so smart. So smart Alex. 
+
+ssh -i "~/Downloads/Brineese-LOSAHDA-kwon.pem" ubuntu@ec2-34-219-94-235.us-west-2.compute.amazonaws.com

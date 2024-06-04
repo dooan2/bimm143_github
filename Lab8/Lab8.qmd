@@ -1,0 +1,150 @@
+---
+title: "Lab8: Unsupervised Learning Mini-Project"
+author: "Duy An Le (PID:A16400411)"
+format: pdf
+---
+# Breast Cancer Dataset Analysis
+
+## 0. Data import
+```{r}
+# Save your input data file into your Project directory
+fna.data <- "WisconsinCancer.csv"
+
+# Complete the following code to input the data and store as wisc.df
+wisc.df <- read.csv(fna.data, row.names=1)
+head(wisc.df)
+
+# The diagnosis column is not needed for the analysis
+wisc.data <- wisc.df[,-1]
+
+# Create diagnosis vector for later 
+diagnosis <- as.factor(wisc.df[,1])
+```
+## 1. Exploratory Data analysis
+
+>Q1. How many observations are in this dataset?
+
+```{r}
+print(paste("The number of observations is", nrow(wisc.df)))
+```
+
+>Q2. How many of the observations have a malignant diagnosis?
+
+```{r}
+print(paste("The number of observations with a malignant diagnosis is", 
+            sum(wisc.df$diagnosis == "M")))
+```
+
+>Q3. How many variables/features in the data are suffixed with _mean?
+
+```{r}
+print(paste("The number of variables with '_mean' suffix is", 
+            length(grep("_mean", names(wisc.df)))))
+```
+
+### Clustering
+We can try k-means clustering first 
+```{r}
+km <- kmeans(wisc.data, centers=2)
+table(km$cluster, diagnosis)
+```
+Let's try hierarchical clustering
+```{r}
+hc <- hclust(dist(wisc.data))
+plot(hc)
+```
+
+
+## 2. Principal Component Analysis 
+
+Check if the data needs to be scaled
+```{r}
+colMeans(wisc.data)
+apply(wisc.data, 2, sd)
+```
+The variables use different units and variance and means are thus very different. Scaling is appropriate here.
+```{r}
+wisc.pr <- prcomp(wisc.data, scale.=T)
+summary(wisc.pr)
+```
+Generate our main PCA plot (score plot, PC1 vs. PC2 plot)... 
+
+```{r}
+library(ggplot2)
+
+# Convert pca results to dataframe 
+res <- as.data.frame(wisc.pr$x)
+
+# Use ggplot 
+ggplot(res) + aes(x=PC1, y=PC2, col=diagnosis) + geom_point()
+```
+
+
+> Q4. From your results, what proportion of the original variance is captured by the first principal components (PC1)?
+
+```{r}
+print(paste("The original variance captured by PC1 is", summary(wisc.pr)$importance[2,1]))
+```
+
+> Q5. How many principal components (PCs) are required to describe at least 70% of the original variance in the data?
+
+```{r}
+PC.70 <- 1 + sum(unname(summary(wisc.pr)$importance[3,] < 0.7))
+print(paste("The number of PCs required for 70% of original variance is", PC.70))
+```
+
+> Q6. How many principal components (PCs) are required to describe at least 90% of the original variance in the data?
+
+```{r}
+PC.90 <- 1 + sum(unname(summary(wisc.pr)$importance[3,] < 0.9))
+print(paste("The number of PCs required for 90% of original variance is", PC.90))
+```
+
+Now we can plot the PCA using `biplot()`
+```{r}
+biplot(wisc.pr)
+```
+> Q7. What stands out to you about this plot? Is it easy or difficult to understand? Why?
+
+This plot is very hard to read due to overcrowding. Too many data points (patients) and several original variables that make it difficult to observe trends. Nothing really stands out on this plot. 
+
+
+## 5. Combining Methods 
+
+Clustering on PCA results 
+
+```{r}
+
+d <- dist(wisc.pr$x[,1:7])
+hc <- hclust(d, method="ward.D2")
+plot(hc)
+```
+Use `cutree()` to get membership vector
+```{r}
+grps <- cutree(hc, k=2)
+
+print(paste("There are", table(grps)[1], "patients in Group 1 and", table(grps)[2], "patients in Group 2"))
+```
+## 7. Prediction 
+
+Use PCA result to do predictions, use unseen data and project it onto our new PC variables. 
+
+```{r}
+url <- "https://tinyurl.com/new-samples-CSV"
+new <- read.csv(url)
+npc <- predict(wisc.pr, newdata=new)
+npc
+```
+Now plot these two patients on a map against original data. 
+```{r}
+plot(wisc.pr$x[,1:2], col=grps)
+points(npc[,1], npc[,2], col="blue", pch=16, cex=3)
+text(npc[,1], npc[,2], c(1,2), col="white")
+```
+> Q18. Which of these patients would you prioritize for followup 
+
+I would prioritize patient 2 for followup. 
+
+
+# Summary
+PCA is a super useful method for analyzing large datasets. It works by finding new variables (PCs) that capture the most variance from the original variables in your dataset. 

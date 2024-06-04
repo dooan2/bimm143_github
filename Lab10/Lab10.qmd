@@ -1,0 +1,121 @@
+---
+title: "Lab10: Structural Bioinformatics"
+author: "Duy An Le (PID: A16400411)"
+format: pdf
+---
+
+The main repository of biomolecular structure is the PDB <www.rcsb.org>
+
+Download the csv file of PDB contents by experimental method and molecular type.
+```{r}
+pdb_data <- read.csv("Data Export Summary.csv", row.names=1)
+
+sum.comma <- function(x){
+  sum(as.numeric(gsub(",", "", x)))
+}
+```
+> Q1: What percentage of structures in the PDB are solved by X-Ray and Electron Microscopy.
+
+```{r}
+sum_col <- apply(pdb_data, 2, sum.comma)
+percent.xray.em <- (sum_col["X.ray"] + sum_col["EM"])/sum_col["Total"]
+```
+The percentage of X-ray and EM structures is `r percent.xray.em*100`. 
+
+> Q2: What proportion of structures in the PDB are protein?
+
+```{r}
+percent.protein <- as.numeric(gsub(",","",pdb_data[1,"Total"]))/sum.comma(pdb_data$Total)
+```
+The proportion of structures that are protein `r percent.protein`
+
+> Q3: Type HIV in the PDB website search box on the home page and determine how many HIV-1 protease structures are in the current PDB?
+
+There are 4445 structures. 
+
+## Visualizing the HIV-1 protease structure
+
+Mol* viewer is now everywhere <https://molstar.org/viewer/> 
+
+Insert an image from Mol* here: 
+
+1HSG (HIV)
+
+![My first molecular image with aspartic acid and water highlighted.](1HSG.png)
+
+## Working with the bio3d package
+
+```{r}
+library(bio3d)
+
+pdb <- read.pdb("1hsg")
+head(pdb$atom)
+```
+```{r}
+pdbseq(pdb)[25]
+```
+
+## Predicting function motions of a single structure
+
+We can do bioinformatics prediction of functional motions (ie. flexibility, dynamics)
+
+```{r}
+pdb <- read.pdb("6s36")
+pdb
+```
+```{r}
+m <- nma(pdb)
+plot(m)
+```
+```{r}
+mktrj(m, file="adk_m7.pdb")
+```
+
+# Comparative Analysis of Protein Structures
+
+Here we will work through complete pipeline of analysis for a given protein family starting from one single database ID for a member of this family all the way to a deeper understanding of structure, dyanmics, and function. 
+
+```{r}
+library(bio3d)
+```
+
+```{r}
+id <- "1ake_A"
+aa <- get.seq(id)
+
+```
+
+```{r}
+b <- blast.pdb(aa)
+```
+```{r}
+hits <- NULL
+hits$pdb.id <- c('1AKE_A','6S36_A','6RZE_A','3HPR_A','1E4V_A','5EJE_A','1E4Y_A','3X2S_A','6HAP_A','6HAM_A','4K46_A','3GMT_A','4PZL_A')
+```
+
+
+```{r}
+# Download releated PDB files
+files <- get.pdb(hits$pdb.id, path="pdbs", split=TRUE, gzip=TRUE)
+```
+
+```{r}
+# Align releated PDBs
+pdbs <- pdbaln(files, fit = TRUE, exefile="msa")
+```
+```{r}
+pdbs
+```
+
+
+```{r}
+# Perform PCA
+pc.xray <- pca(pdbs)
+plot(pc.xray)
+```
+
+```{r}
+# Visualize first principal component
+pc1 <- mktrj(pc.xray, pc=1, file="pc_1.pdb")
+```
+

@@ -1,0 +1,222 @@
+---
+title: "Lab13: Transcriptomics and the analysis of RNA-Seq data"
+author: "Duy An Le (PID: A16400411)"
+format: pdf
+---
+
+The data from today's lab comes from a published RNA-seq experiment where airway smooth muscle cells were treated with dexamethasone, a synthetic glucocorticoid steroid with anti-inflammatory effects. 
+
+## Import Data
+
+We need the raw counts and metadata for DESeq2. 
+
+```{r}
+counts <- read.csv("airway_scaledcounts.csv", row.names=1)
+metadata <- read.csv("airway_metadata.csv")
+
+head(counts)
+head(metadata)
+```
+
+The counts are organized with one gene per row and experiment per column. 
+
+```{r}
+nrow(counts)
+sum(metadata$dex=="control")
+```
+
+### Check on match of metadata and coldata names
+
+```{r}
+all(colnames(counts) == metadata$id)
+```
+
+## Analysis 
+
+I want to start by comparing "control" and "treated" columns. To do this, I will find the average for each gene (row) in all "control" columns. Then I will find the average in the "treated' columns. Then I will compare them. 
+
+```{r}
+library(dplyr)
+
+control <- metadata %>% filter(dex=="control")
+control.counts <- counts %>% select(control$id) 
+control.mean <- rowSums(control.counts)/4
+
+treated <- metadata %>% filter(dex=="treated")
+treated.counts <- counts %>% select(treated$id)
+treated.mean <- rowSums(treated.counts)/4
+
+meancounts <- data.frame(control.mean, treated.mean)
+head(meancounts)
+```
+"Normalize" the data
+
+```{r}
+colSums(meancounts)
+```
+
+Create the initial scatter plot 
+
+```{r}
+plot(meancounts, log="xy")
+```
+Calculate log2fc of mean counts
+
+```{r}
+meancounts$log2fc <- log2(meancounts[,"treated.mean"]/meancounts[,"control.mean"])
+head(meancounts)
+```
+Filter out genes with 0 expression 
+
+```{r}
+zero.vals <- which(meancounts[,1:2]==0, arr.ind=TRUE)
+
+to.rm <- unique(zero.vals[,1])
+mycounts <- meancounts[-to.rm,]
+head(mycounts)
+```
+
+Define where the log2fc of gene expression is > 2 and < -2
+
+```{r}
+up.ind <- mycounts$log2fc > +2
+down.ind <- mycounts$log2fc < (-2)
+
+sum(up.ind)
+sum(down.ind)
+```
+
+## DESeq analysis 
+
+We need to do this analysis properly with our inner stats person kept happy. 
+
+```{r}
+#| message: false
+library(DESeq2)
+```
+
+```{r}
+dds <- DESeqDataSetFromMatrix(countData=counts, 
+                              colData=metadata, 
+                              design=~dex)
+dds
+```
+Run DEseq analysis 
+
+```{r}
+dds <- DESeq(dds)
+```
+Get the results
+
+```{r}
+res <- results(dds)
+head(res)
+```
+
+I want to make a figure showing overview of all my results. A plot of log2 fold change vs the p-value (using adjusted p-value)
+
+```{r}
+# Setup our custom point color vector 
+mycols <- rep("gray", nrow(res))
+mycols[ abs(res$log2FoldChange) > 2 ]  <- "red" 
+
+inds <- (res$padj < 0.01) & (abs(res$log2FoldChange) > 2 )
+mycols[ inds ] <- "blue"
+
+# Volcano plot with custom colors 
+plot( res$log2FoldChange,  -log(res$padj), 
+ col=mycols, ylab="-Log(P-value)", xlab="Log2(FoldChange)" )
+
+# Cut-off lines
+abline(v=c(-2,2), col="gray", lty=2)
+abline(h=-log(0.1), col="gray", lty=2)
+```
+
+## Add annotation data
+
+We want to add on gene symbols (i.e. gene names) as well as other common identifiers from major databases for all our genes of interest. 
+
+```{r}
+library("AnnotationDbi")
+library("org.Hs.eg.db")
+```
+We can translate between the following IDs. 
+
+```{r}
+columns(org.Hs.eg.db)
+```
+Figure out what our original keys are
+
+```{r}
+head(res)
+```
+These are "ENSEMBL" ids we want to convert to "SYMBOL" 
+
+```{r}
+res$symbol <- mapIds(org.Hs.eg.db,
+                     keys=row.names(res), # Our genenames
+                     keytype="ENSEMBL",   # The format of our genenames
+                     column="SYMBOL",     # The new format we want to add
+                     multiVals="first")
+```
+
+We also want "GENENAME" and "ENTREZID" 
+
+```{r}
+res$genename <- mapIds(org.Hs.eg.db, keys=row.names(res), keytype="ENSEMBL", column="GENENAME", multiVals="first")
+
+res$entrez <- mapIds(org.Hs.eg.db, keys=row.names(res), keytype="ENSEMBL", column="ENTREZID", multiVals="first")
+
+head(res)
+```
+
+Save data to csv
+
+```{r}
+write.csv(res, "deseq_results.csv")
+```
+
+## Pathway Analysis
+
+Here we will use the "gage" package to do some pathway analysis (aka geneset enrichment)
+
+```{r}
+#| message: false
+library(pathview)
+library(gage)
+library(gageData)
+```
+
+Take a look at KEGG data
+```{r}
+data(kegg.sets.hs)
+
+# Examine the first 2 pathways in this kegg set for humans
+head(kegg.sets.hs, 2)
+```
+
+To run gage we need to provide it with a vector of fold-change values (not our big full results table). 
+
+```{r}
+foldchanges <- res$log2FoldChange
+names(foldchanges) <- res$entrez
+```
+
+Now run gage with this input and the KEGG pathways
+
+```{r}
+# Get the results
+keggres <- gage(foldchanges, gsets=kegg.sets.hs)
+```
+
+```{r}
+attributes(keggres)
+head(keggres$greater)
+```
+
+Let's look at one pathway using `pathview()`
+
+```{r}
+pathview(gene.data=foldchanges, pathway.id="hsa05310")
+```
+![](hsa05310.pathview.png)

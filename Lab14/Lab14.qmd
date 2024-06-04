@@ -1,0 +1,212 @@
+---
+title: "Lab14: RNA-Seq analysis mini-project"
+author: "Duy An Le (PID: A16400411)"
+format: pdf
+---
+Here we run through a complete RNASeq analysis from counts to pathways and biological insight... 
+
+## Data Import
+```{r}
+#| message: false
+library(DESeq2)
+
+metaFile <- "GSE37704_metadata.csv"
+countFile <- "GSE37704_featurecounts.csv"
+
+# Import metadata and take a peak
+colData = read.csv(metaFile, row.names=1)
+head(colData)
+
+# Import countdata
+countData = read.csv(countFile, row.names=1)
+head(countData)
+```
+## Setup for DESeq
+```{r}
+# Note we need to remove the odd first $length col
+countData <- as.matrix(countData[,-1])
+
+# Filter count data where you have 0 read count across all samples.
+countData <- countData[rowSums(countData) != 0, ]
+
+head(countData)
+```
+
+## Running DESeq
+```{r}
+dds <- DESeqDataSetFromMatrix(countData=countData,
+                             colData=colData,
+                             design=~condition)
+dds <- DESeq(dds)
+```
+```{r}
+dds
+```
+
+```{r}
+res <- results(dds, contrast=c("condition", "hoxa1_kd", "control_sirna"))
+summary(res)
+```
+
+## Add gene annotation data (gene names etc.)
+
+```{r}
+library("AnnotationDbi")
+library("org.Hs.eg.db")
+
+columns(org.Hs.eg.db)
+
+res$symbol <- mapIds(org.Hs.eg.db,
+                    keys=row.names(res), 
+                    keytype="ENSEMBL",
+                    column="SYMBOL",
+                    multiVals="first")
+
+res$entrez <- mapIds(org.Hs.eg.db,
+                    keys=row.names(res),
+                    keytype="ENSEMBL",
+                    column="ENTREZID",
+                    multiVals="first")
+
+res$name <- mapIds(org.Hs.eg.db,
+                    keys=row.names(res),
+                    keytype="ENSEMBL",
+                    column="GENENAME",
+                    multiVals="first")
+
+head(res, 10)
+```
+
+## Results visualization
+
+Make a volcano plot:
+
+```{r}
+# Make a color vector for all genes
+mycols <- rep("gray", nrow(res))
+
+# Color red the genes with absolute fold change above 2
+mycols[abs(res$log2FoldChange) > 2] <- "red"
+
+# Color blue those with adjusted p-value less than 0.01 and absolute fold change more than 2
+inds <- (res$padj < 0.01) & (abs(res$log2FoldChange) > 2 )
+mycols[inds] <- "blue"
+
+
+plot(res$log2FoldChange, -log(res$padj), xlab="log2FoldChange", ylab="-log(p-adj)", col=mycols, main="Differentially expressed genes of HOXA1 kd experiment")
+```
+
+## Save our results
+
+Save to CSV file:
+
+```{r}
+res <- res[order(res$pvalue),]
+write.csv(res, file="deseq_results.csv")
+```
+
+## Pathway analysis (KEGG, GO, Reactome)
+
+KEGG: 
+```{r}
+library(pathview)
+library(gage)
+library(gageData)
+
+data(kegg.sets.hs)
+data(sigmet.idx.hs)
+
+# Focus on signaling and metabolic pathways only
+kegg.sets.hs <- kegg.sets.hs[sigmet.idx.hs]
+
+# Examine the first 3 pathways
+head(kegg.sets.hs, 3)
+```
+
+```{r}
+foldchanges <- res$log2FoldChange
+names(foldchanges) <- res$entrez
+head(foldchanges)
+```
+
+Do the KEGG pathway analysis:
+```{r}
+# Get the results
+keggres <- gage(foldchanges, gsets=kegg.sets.hs)
+```
+
+Inspect the downregulated pathways: 
+```{r}
+head(keggres$less)
+```
+Inspect the Cell cycle pathway (hsa04110) further:
+```{r}
+pathview(gene.data=foldchanges, pathway.id="hsa04110")
+```
+![](hsa04110.pathview.png)
+Focus on top 5 upregulated pathways here: 
+```{r}
+keggrespathways <- rownames(keggres$greater)[1:5]
+
+# Extract the 8 character long IDs part of each string
+keggresids <- substr(keggrespathways, start=1, stop=8)
+keggresids
+```
+
+```{r}
+#| message: false
+pathview(gene.data=foldchanges, pathway.id=keggresids, species="hsa")
+```
+
+![](hsa04640.pathview.png)
+![](hsa04630.pathview.png)
+![](hsa00140.pathview.png)
+![](hsa04142.pathview.png)
+![](hsa04330.pathview.png)
+
+Focus on top 5 downregulated pathways here: 
+```{r}
+keggrespathways <- rownames(keggres$less)[1:5]
+
+# Extract the 8 character long IDs part of each string
+keggresids <- substr(keggrespathways, start=1, stop=8)
+keggresids
+```
+
+```{r}
+#| message: false
+pathview(gene.data=foldchanges, pathway.id=keggresids, species="hsa")
+```
+
+![](hsa04110.pathview.png)
+![](hsa03030.pathview.png)
+![](hsa03013.pathview.png)
+![](hsa03440.pathview.png)
+![](hsa04114.pathview.png)
+
+Gene Ontology (GO)
+```{r}
+data(go.sets.hs)
+data(go.subs.hs)
+
+# Focus on Biological Process subset of GO
+gobpsets <- go.sets.hs[go.subs.hs$BP]
+
+gobpres <- gage(foldchanges, gsets=gobpsets, same.dir=TRUE)
+
+lapply(gobpres, head)
+```
+
+Reactome 
+```{r}
+sig_genes <- res[res$padj <= 0.05 & !is.na(res$padj), "symbol"]
+print(paste("Total number of significant genes:", length(sig_genes)))
+
+write.table(sig_genes, file="significant_genes.txt", row.names=FALSE, col.names=FALSE, quote=FALSE)
+```
+
+From reactome: the cell cycle pathway had the most significant entities p-value this matches. KEGG has a more general description of the pathway whereas Reactome has more precise descriptions (checkpoints, etc... ) Overall, though, the results are very similar from a manual inspection. 
+
+GO Online
+
+The number 1 pathway was negative regulation of glycogen biosynthetic process. This is different than the KEGG results. KEGG groups genes into pathway groups while GO will assign each gene based on ontology. These two databases vary based on how they assign genes to functions and broad classes so the results tend to differ. 

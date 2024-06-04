@@ -1,0 +1,40 @@
+---
+title: "Lab11: Genome informatics and high throughput sequencing"
+author: "Duy An Le (PID:A16400411)"
+format: pdf
+---
+
+## Read in file:
+
+```{r}
+geneexp <- read.table("geneexpression.txt")
+head(geneexp)
+```
+>Q13: Read this file into R and determine the sample size for each genotype and their corresponding median expression levels for each of these genotypes.
+
+```{r}
+library(dplyr)
+aa = geneexp %>% filter(geno=="A/A")
+ag = geneexp %>% filter(geno=="A/G")
+gg = geneexp %>% filter(geno=="G/G")
+
+aaplot <- boxplot(aa$exp, plot=F)
+agplot <- boxplot(ag$exp, plot=F)
+ggplot <- boxplot(gg$exp, plot=F)
+```
+
+The sample size of A/A genotype is `r nrow(aa)` and the median expression level is `r aaplot$stats[3]`. The sample size of the A/G genotype is `r nrow(ag)` and the median expression level is `r agplot$stats[3]`. The sample size of the G/G genotype is `r nrow(gg)` and the median expression level is `r ggplot$stats[3]`.
+
+
+> Q14: Generate a boxplot with a box per genotype, what could you infer from the relative expression value between A/A and G/G displayed in this plot? Does the SNP effect the expression of ORMDL3?
+
+```{r}
+library(ggplot2)
+```
+
+Make a boxplot with ggplot
+```{r}
+ggplot(geneexp) + aes(geno, exp, fill=geno) + geom_boxplot(notch=T)
+```
+
+It seems that the relative expression level of ORMDL3 in A/A genotypes is higher than that of the G/G genotypes. Having the SNP seems to affect the expression of ORMDL3 and may be correlated with having asthma. 
