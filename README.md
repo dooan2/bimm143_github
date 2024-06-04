@@ -11,9 +11,11 @@ My Classwork for BIMM 143 SP24 at UC San Diego.
 - **Class 8** [Unsupervised Learning Mini-Project]()
 - **Class 9** [Halloween Candy Mini-Project]()
 - **Class 10** [Structural Bioinformatics (pt1)]()
-- **Class 11**
-- **Class 12**
-- **Class 13**
-- **Class 14**
-- **Class 15**
-- **Class 16**
+- **Class 11** [Genome informatics]()
+- **Class 12** [Structural Bioinformatics (pt2. Focus on new AlphaFold2)]()
+- **Class 13** [Transcriptomics and the analysis of RNA-Seq data]()
+- **Class 14** [RNA-Seq analysis mini-project]()
+- **Class 15** [Hands-on with Git and GitHub]()
+- **Class 16** [Essential UNIX for bioinformatics]()
+- **Class 17** [Analyzing sequencing data in the cloud]()
+- **Class 18** [Mini Project: Investigating Pertussis Resurgence]()
